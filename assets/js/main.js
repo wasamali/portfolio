@@ -1,111 +1,287 @@
 /**
- * Portfolio JavaScript - Wasam Ali
+ * Wasam Ali — Swiss-Style Brand & Systems Designer Portfolio
+ * Main Interactive Engine
  */
 
 document.addEventListener('DOMContentLoaded', () => {
-  // 1. Theme Toggle
-  const themeToggleBtn = document.getElementById('theme-toggle');
-  const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)');
-  
-  // Check stored theme or system preference
-  const currentTheme = localStorage.getItem('theme') || (prefersDarkScheme.matches ? 'dark' : 'light');
-  document.documentElement.setAttribute('data-theme', currentTheme);
-  updateThemeIcon(currentTheme);
+  initArchiveTable();
+  initModalLightbox();
+  initClipboardToast();
+  initContactForm();
+  initNavigation();
+});
 
-  if (themeToggleBtn) {
-    themeToggleBtn.addEventListener('click', () => {
-      const activeTheme = document.documentElement.getAttribute('data-theme');
-      const newTheme = activeTheme === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', newTheme);
-      localStorage.setItem('theme', newTheme);
-      updateThemeIcon(newTheme);
+/**
+ * 1. Project Catalogue / Archive Table with Swiss Filter Pills
+ */
+function initArchiveTable() {
+  const tableBody = document.getElementById('archive-table-body');
+  const filterPills = document.querySelectorAll('.filter-pill');
+  if (!tableBody || !window.portfolioData) return;
+
+  const archiveData = window.portfolioData.archive;
+
+  function renderRows(filteredItems) {
+    tableBody.innerHTML = '';
+    filteredItems.forEach((item) => {
+      const tr = document.createElement('tr');
+      tr.className = 'table-row-clickable';
+      tr.setAttribute('data-index', item.index);
+      tr.innerHTML = `
+        <td class="table-index">${item.index}</td>
+        <td>
+          <div class="table-client">${item.client}</div>
+          <div class="table-project">${item.project}</div>
+        </td>
+        <td><span class="table-category-tag">${item.category}</span></td>
+        <td class="table-deliverables">${item.deliverables}</td>
+        <td class="table-year">${item.year}</td>
+        <td class="table-action"><span class="arrow-right">→</span></td>
+      `;
+      tr.addEventListener('click', () => {
+        openModalWithArchiveItem(item);
+      });
+      tableBody.appendChild(tr);
     });
   }
 
-  function updateThemeIcon(theme) {
-    if (!themeToggleBtn) return;
-    themeToggleBtn.innerHTML = theme === 'dark' 
-      ? `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`
-      : `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`;
-  }
+  // Initial full render
+  renderRows(archiveData);
 
-  // 2. Navbar Scroll Effect
-  const navbar = document.getElementById('navbar');
-  window.addEventListener('scroll', () => {
-    if (window.scrollY > 40) {
-      navbar.classList.add('scrolled');
-    } else {
-      navbar.classList.remove('scrolled');
+  // Filter Pills logic
+  filterPills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      filterPills.forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+
+      const filterKey = pill.getAttribute('data-filter');
+      if (filterKey === 'all') {
+        renderRows(archiveData);
+      } else {
+        const filtered = archiveData.filter(item => item.categoryKey === filterKey);
+        renderRows(filtered);
+      }
+    });
+  });
+}
+
+/**
+ * 2. Lightbox Modal for Design Inspection
+ */
+function initModalLightbox() {
+  const modalOverlay = document.getElementById('lightbox-modal');
+  const modalClose = document.getElementById('modal-close-btn');
+  if (!modalOverlay) return;
+
+  // Close handlers
+  if (modalClose) {
+    modalClose.addEventListener('click', closeModal);
+  }
+  modalOverlay.addEventListener('click', (e) => {
+    if (e.target === modalOverlay) closeModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modalOverlay.classList.contains('active')) {
+      closeModal();
     }
   });
 
-  // 3. Mobile Navigation Menu
-  const mobileMenuBtn = document.getElementById('mobile-menu-btn');
-  const navLinks = document.getElementById('nav-links');
+  // Attach click listener to all Swiss placeholder frames across the page
+  document.querySelectorAll('.swiss-placeholder-frame').forEach(frame => {
+    frame.addEventListener('click', () => {
+      const title = frame.getAttribute('data-title') || 'Design Artifact';
+      const category = frame.getAttribute('data-category') || 'Visual Systems';
+      const specs = frame.getAttribute('data-specs') || '1:1 Vector Architecture';
+      const tag = frame.getAttribute('data-tag') || 'Spatial & Print';
+      const aspect = frame.getAttribute('data-aspect') || 'aspect-16-9';
+      const notes = frame.getAttribute('data-notes') || '';
 
-  if (mobileMenuBtn && navLinks) {
-    mobileMenuBtn.addEventListener('click', () => {
-      navLinks.classList.toggle('open');
+      openModal({
+        title,
+        client: category,
+        deliverables: specs,
+        aspect,
+        tag,
+        notes
+      });
+    });
+  });
+}
+
+function openModal(data) {
+  const modalOverlay = document.getElementById('lightbox-modal');
+  const modalContent = document.getElementById('modal-body');
+  if (!modalOverlay || !modalContent) return;
+
+  modalContent.innerHTML = `
+    <div style="margin-bottom: 1.5rem; border-bottom: 1px solid #222222; padding-bottom: 1rem;">
+      <div style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--c-accent); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.35rem;">
+        ${data.client || 'Portfolio Case Study'} / ${data.tag || 'Artifact'}
+      </div>
+      <h3 style="font-size: 1.85rem; font-weight: 800; letter-spacing: -0.03em; color: #ffffff; line-height: 1.15;">
+        ${data.title}
+      </h3>
+    </div>
+
+    <!-- Scaled Swiss Frame Viewer -->
+    <div class="swiss-placeholder-frame ${data.aspect || 'aspect-16-9'}" style="margin-bottom: 1.5rem; background-color: #080808; border-color: #333333; cursor: default;">
+      <div class="frame-center-grid"></div>
+      <span class="frame-crosshair top-left">+</span>
+      <span class="frame-crosshair top-right">+</span>
+      <span class="frame-crosshair bottom-left">+</span>
+      <span class="frame-crosshair bottom-right">+</span>
+      <div class="frame-content-inner">
+        <span class="frame-tag">${data.tag || 'Architectural System'}</span>
+        <div class="frame-label" style="font-size: 1.2rem;">${data.title}</div>
+        <div class="frame-specs" style="color: #888888; margin-top: 0.5rem;">${data.deliverables || 'Production-Grade Asset'}</div>
+        <div style="margin-top: 1rem; font-family: var(--font-mono); font-size: 0.7rem; color: #555555;">
+          ASSET READY FOR HIGH-RESOLUTION CLIENT DISPLAY
+        </div>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; font-size: 0.9rem; color: #aaaaaa; border-top: 1px solid #222222; padding-top: 1.25rem;">
+      <div>
+        <div style="font-family: var(--font-mono); font-size: 0.7rem; text-transform: uppercase; color: #666666; margin-bottom: 0.25rem;">Deliverables & Format</div>
+        <div style="color: #ffffff; font-weight: 600;">${data.deliverables || 'Complete Visual Identity System'}</div>
+      </div>
+      <div>
+        <div style="font-family: var(--font-mono); font-size: 0.7rem; text-transform: uppercase; color: #666666; margin-bottom: 0.25rem;">Status / Access</div>
+        <div style="color: #10b981; font-weight: 600;">● Production Verified (2020–2026)</div>
+      </div>
+    </div>
+
+    ${data.notes ? `
+      <div class="confidentiality-badge" style="margin-top: 1.25rem;">
+        ${data.notes}
+      </div>
+    ` : ''}
+  `;
+
+  modalOverlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function openModalWithArchiveItem(item) {
+  openModal({
+    title: item.project,
+    client: item.client,
+    deliverables: item.deliverables,
+    aspect: item.aspectRatio === '1:1' ? 'aspect-1-1' : (item.aspectRatio === '4:3' ? 'aspect-4-3' : 'aspect-16-9'),
+    tag: item.category,
+    notes: `Selected from Wasam Ali's Comprehensive Project Archive (${item.year}). Architectural identity and deliverable production.`
+  });
+}
+
+function closeModal() {
+  const modalOverlay = document.getElementById('lightbox-modal');
+  if (modalOverlay) {
+    modalOverlay.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+}
+
+/**
+ * 3. Copy Email to Clipboard Toast
+ */
+function initClipboardToast() {
+  const copyButtons = document.querySelectorAll('.copy-email-btn');
+  const toast = document.getElementById('toast-notification');
+  const emailToCopy = "wasamali775@gmail.com";
+
+  copyButtons.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      navigator.clipboard.writeText(emailToCopy).then(() => {
+        showToast(`Copied: ${emailToCopy}`);
+      }).catch(() => {
+        // Fallback mailto
+        window.location.href = `mailto:${emailToCopy}`;
+      });
+    });
+  });
+
+  function showToast(message) {
+    if (!toast) return;
+    toast.textContent = message;
+    toast.classList.add('show');
+    setTimeout(() => {
+      toast.classList.remove('show');
+    }, 2800);
+  }
+}
+
+/**
+ * 4. Inline Minimal Swiss Contact Form
+ */
+function initContactForm() {
+  const contactForm = document.getElementById('swiss-contact-form');
+  if (!contactForm) return;
+
+  contactForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = document.getElementById('contact-name').value;
+    const org = document.getElementById('contact-org').value;
+    const message = document.getElementById('contact-message').value;
+
+    const subject = encodeURIComponent(`Executive Project Inquiry: ${name} (${org})`);
+    const body = encodeURIComponent(`From: ${name}\nOrganization: ${org}\n\nProject Scope & Role Inquiry:\n${message}\n`);
+    const mailtoUrl = `mailto:wasamali775@gmail.com?subject=${subject}&body=${body}`;
+
+    const submitBtn = contactForm.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = 'Transmitting...';
+
+    setTimeout(() => {
+      window.location.href = mailtoUrl;
+      submitBtn.innerHTML = 'Transmitted via Email Client ✓';
+      contactForm.reset();
+      setTimeout(() => {
+        submitBtn.innerHTML = originalText;
+      }, 3500);
+    }, 600);
+  });
+}
+
+/**
+ * 5. Navigation & Mobile Drawer
+ */
+function initNavigation() {
+  const mobileToggle = document.getElementById('mobile-toggle');
+  const mobileDrawer = document.getElementById('mobile-drawer');
+
+  if (mobileToggle && mobileDrawer) {
+    mobileToggle.addEventListener('click', () => {
+      mobileDrawer.classList.toggle('open');
     });
 
-    // Close menu when clicking any nav link
-    document.querySelectorAll('.nav-link').forEach(link => {
+    mobileDrawer.querySelectorAll('a').forEach(link => {
       link.addEventListener('click', () => {
-        navLinks.classList.remove('open');
+        mobileDrawer.classList.remove('open');
       });
     });
   }
 
-  // 4. Active Navigation Link on Scroll
-  const sections = document.querySelectorAll('section[id]');
-  window.addEventListener('scroll', () => {
-    const scrollY = window.pageYOffset;
-    sections.forEach(current => {
-      const sectionHeight = current.offsetHeight;
-      const sectionTop = current.offsetTop - 120;
-      const sectionId = current.getAttribute('id');
-      const targetNavLink = document.querySelector(`.nav-link[href*="${sectionId}"]`);
+  // Active section tracking on scroll
+  const sections = document.querySelectorAll('section[id], footer[id]');
+  const navLinks = document.querySelectorAll('.nav-anchor');
 
-      if (targetNavLink) {
-        if (scrollY > sectionTop && scrollY <= sectionTop + sectionHeight) {
-          targetNavLink.classList.add('active');
-        } else {
-          targetNavLink.classList.remove('active');
-        }
+  window.addEventListener('scroll', () => {
+    const scrollPos = window.scrollY + 120;
+    sections.forEach(section => {
+      const top = section.offsetTop;
+      const height = section.offsetHeight;
+      const id = section.getAttribute('id');
+
+      if (scrollPos >= top && scrollPos < top + height) {
+        navLinks.forEach(link => {
+          if (link.getAttribute('href') === `#${id}`) {
+            link.classList.add('active');
+          } else {
+            link.classList.remove('active');
+          }
+        });
       }
     });
   });
-
-  // 5. Contact Form Submission
-  const contactForm = document.getElementById('contact-form');
-  if (contactForm) {
-    contactForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const name = document.getElementById('form-name').value;
-      const email = document.getElementById('form-email').value;
-      const message = document.getElementById('form-message').value;
-
-      // Create mailto fallback link
-      const mailtoLink = `mailto:wasamali775@gmail.com?subject=Contact from ${encodeURIComponent(name)}&body=${encodeURIComponent(`From: ${name} (${email})\n\nMessage:\n${message}`)}`;
-      
-      const submitBtn = contactForm.querySelector('button[type="submit"]');
-      const originalText = submitBtn.innerHTML;
-      submitBtn.innerHTML = 'Opening Email Client...';
-      
-      setTimeout(() => {
-        window.location.href = mailtoLink;
-        submitBtn.innerHTML = 'Message Prepared!';
-        contactForm.reset();
-        setTimeout(() => {
-          submitBtn.innerHTML = originalText;
-        }, 3000);
-      }, 600);
-    });
-  }
-
-  // 6. Dynamic Year
-  const currentYearSpan = document.getElementById('current-year');
-  if (currentYearSpan) {
-    currentYearSpan.textContent = new Date().getFullYear();
-  }
-});
+}
